@@ -1,0 +1,6 @@
+{
+  "name": "AI Outreach Machine",
+  "description": "Full-stack web application designed for semi-automated outreach workflows featuring Apify integration and Gemini AI personalization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

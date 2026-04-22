@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Security Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isOwner(userId) { return request.auth.uid == userId; }
+
+    // User Validator
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'createdAt', 'updatedAt']) 
+        && data.size() >= 3 && data.size() <= 4
+        && data.email is string && data.email.size() <= 100
+        && data.createdAt is number
+        && data.updatedAt is number
+        && (!data.keys().hasAny(['encryptedApifyKey']) || (data.encryptedApifyKey is string && data.encryptedApifyKey.size() <= 500));
+    }
+
+    // Lead Validator
+    function isValidLead(data) {
+      return data.keys().hasAll(['userId', 'name', 'profileUrl', 'platform', 'status'])
+        && data.size() >= 5 && data.size() <= 12
+        && data.userId is string && data.userId == request.auth.uid
+        && data.name is string && data.name.size() <= 200
+        && data.profileUrl is string && data.profileUrl.size() <= 1000
+        && data.platform is string && data.platform in ['LinkedIn', 'Instagram', 'Email']
+        && data.status is string && data.status in ['Not Sent', 'Sent', 'Follow-up 1', 'Follow-up 2', 'Replied', 'Skipped']
+        && (!data.keys().hasAny(['bio']) || (data.bio is string && data.bio.size() <= 2000))
+        && (!data.keys().hasAny(['email']) || (data.email is string && data.email.size() <= 150))
+        && (!data.keys().hasAny(['score']) || (data.score is number))
+        && (!data.keys().hasAny(['label']) || (data.label is string && data.label in ['High', 'Medium', 'Low', 'Unscored']))
+        && (!data.keys().hasAny(['message']) || (data.message is string && data.message.size() <= 5000))
+        && (!data.keys().hasAny(['followUps']) || (data.followUps is list && data.followUps.size() <= 10 && (data.followUps.size() == 0 || data.followUps[0] is string)))
+        && (!data.keys().hasAny(['lastActionDate']) || (data.lastActionDate is number));
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId) && isValidId(userId);
+      allow create: if isSignedIn() && isOwner(userId) && isValidId(userId)
+                    && isValidUser(incoming())
+                    && incoming().keys().hasAll(['email', 'createdAt', 'updatedAt'])
+                    && incoming().createdAt == request.time.toMillis()
+                    && incoming().updatedAt == request.time.toMillis();
+      allow update: if isSignedIn() && isOwner(userId) && isValidId(userId)
+                    && isValidUser(incoming())
+                    && incoming().createdAt == existing().createdAt
+                    && (incoming().diff(existing()).affectedKeys().hasOnly(['encryptedApifyKey', 'updatedAt']));
+    }
+
+    match /users/{userId}/leads/{leadId} {
+      allow get: if isSignedIn() && isOwner(userId) && isValidId(userId) && isValidId(leadId);
+      allow list: if isSignedIn() && isOwner(userId) && isValidId(userId);
+      allow create: if isSignedIn() && isOwner(userId) && isValidId(userId) && isValidId(leadId)
+                    && exists(/databases/$(database)/documents/users/$(userId))
+                    && isValidLead(incoming());
+      allow update: if isSignedIn() && isOwner(userId) && isValidId(userId) && isValidId(leadId)
+                    && isValidLead(incoming())
+                    && incoming().userId == existing().userId
+                    // Any field can be updated by the owner during the generation/enrichment process
+                    && (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'bio', 'email', 'score', 'label', 'message', 'followUps', 'status', 'lastActionDate']));
+      allow delete: if isSignedIn() && isOwner(userId) && isValidId(userId) && isValidId(leadId);
+    }
+  }
+}
