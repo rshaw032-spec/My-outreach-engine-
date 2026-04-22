@@ -25,10 +25,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userSnap = await getDoc(userRef);
         if (!userSnap.exists()) {
           try {
+            const now = Date.now();
             await setDoc(userRef, {
               email: currentUser.email,
-              createdAt: Date.now(),
-              updatedAt: Date.now()
+              createdAt: now,
+              updatedAt: now
             });
           } catch(err) {
             console.error("Failed to create user doc", err);

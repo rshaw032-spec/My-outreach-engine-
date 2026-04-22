@@ -48,8 +48,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && isOwner(userId) && isValidId(userId)
                     && isValidUser(incoming())
                     && incoming().keys().hasAll(['email', 'createdAt', 'updatedAt'])
-                    && incoming().createdAt <= request.time.toMillis() + 100000
-                    && incoming().createdAt >= request.time.toMillis() - 100000
+                    && incoming().createdAt is number
                     && incoming().updatedAt == incoming().createdAt;
       allow update: if isSignedIn() && isOwner(userId) && isValidId(userId)
                     && isValidUser(incoming())

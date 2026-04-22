@@ -62,6 +62,7 @@ async function startServer() {
       if (platform === 'Skool') siteFilter = `site:skool.com`;
       if (platform === 'Discord') siteFilter = `site:discord.com OR "Discord"`;
       if (platform === 'Twitter') siteFilter = `site:twitter.com OR site:x.com`;
+      if (platform === 'Email') siteFilter = ``;
 
       // Build extra search terms if painPoints provided
       // Roughly pull keywords out to make the search more targeted
